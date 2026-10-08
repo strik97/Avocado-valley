@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Avocado Valley — Level 1</title>
+<style>
+html,body{margin:0;height:100%;background:#15251c;font-family:system-ui,-apple-system,Segoe UI,sans-serif;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center}
+#wrap{width:min(100vw,960px);height:100vh;display:flex;align-items:center;justify-content:center}
+canvas{width:100%;max-height:100vh;aspect-ratio:16/9;background:#9bdcf0;touch-action:none}
+</style>
+</head>
+<body><div id="wrap"><canvas id="game" width="960" height="540"></canvas></div>
+<script>
+const c=document.getElementById('game'),ctx=c.getContext('2d'),W=960,H=540;
+let keys={},state='play',score=0,lives=3,pit=null,particles=[];
+const p={x:70,y:400,w:46,h:58,vx:0,vy:0,on:false,face:1,inv:0};
+const plats=[
+{x:0,y:485,w:960,h:55},{x:130,y:410,w:140,h:20},{x:330,y:350,w:135,h:20},
+{x:520,y:425,w:130,h:20},{x:690,y:325,w:125,h:20},{x:825,y:405,w:105,h:20}];
+const enemies=[
+{x:220,y:370,w:42,h:40,v:1,min:150,max:260,type:0},
+{x:545,y:385,w:42,h:40,v:1.3,min:520,max:615,type:1},
+{x:720,y:285,w:42,h:40,v:1.1,min:695,max:800,type:0}];
+const stars=[{x:195,y:370,on:true},{x:395,y:310,on:true},{x:750,y:285,on:true}];
+const cps=[{x:465,hit:false},{x:810,hit:false}];
+function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+function jump(){if(p.on){p.vy=-12;p.on=false}}
+function shoot(){if(pit||state!=='play')return;pit={x:p.x+(p.face>0?p.w:-18),y:p.y+24,w:18,h:18,vx:p.face*10,vy:-2,life:85}}
+function reset(){p.x=70;p.y=400;p.vx=p.vy=0;p.inv=80;pit=null}
+function burst(x,y){for(let i=0;i<10;i++)particles.push({x,y,vx:(Math.random()-.5)*5,vy:(Math.random()-.7)*5,l:30})}
+addEventListener('keydown',e=>{keys[e.key]=1;if([' ','ArrowUp','w'].includes(e.key))jump();if(e.key==='f')shoot();if(e.key==='r')location.reload()});
+addEventListener('keyup',e=>keys[e.key]=0);
+
+function update(){
+ if(state!=='play')return;
+ p.vx=(keys.ArrowRight||keys.d?4.5:0)-(keys.ArrowLeft||keys.a?4.5:0);
+ if(p.vx)p.face=p.vx>0?1:-1;
+ p.x+=p.vx;p.vy+=.55;p.y+=p.vy;p.on=false;
+ for(const q of plats)if(p.vy>=0&&p.x+p.w>q.x&&p.x<q.x+q.w&&p.y+p.h>=q.y&&p.y+p.h<=q.y+p.vy+8){p.y=q.y-p.h;p.vy=0;p.on=true}
+ p.x=Math.max(0,Math.min(W-p.w,p.x));
+ if(p.y>H+40){lives--;lives?reset():state='over'}
+ if(p.inv)p.inv--;
+ for(const e of enemies){
+  e.x+=e.v;if(e.x<e.min||e.x>e.max)e.v*=-1;
+  if(hit(p,e)&&!p.inv){if(p.vy>2){burst(e.x,e.y);score+=25;p.vy=-8;e.x=e.min}else{lives--;lives?reset():state='over'}}
+ }
+ if(pit){
+  pit.x+=pit.vx;pit.y+=pit.vy;pit.vy+=.25;pit.life--;
+  for(const e of enemies)if(hit(pit,e)){burst(e.x,e.y);score+=50;e.x=e.min;pit=null;break}
+  if(pit)for(const q of plats)if(hit(pit,q)){pit.vx*=-.82;pit.vy=-Math.abs(pit.vy)*.7}
+  if(pit&&(pit.life<0||pit.x<-30||pit.x>W+30||pit.y>H+30))pit=null
+ }
+ for(const s of stars)if(s.on&&hit(p,{x:s.x-12,y:s.y-12,w:24,h:24})){s.on=false;score+=100;burst(s.x,s.y)}
+ for(const cp of cps)if(!cp.hit&&p.x>cp.x){cp.hit=true;score+=25}
+ if(p.x>900)state='win';
+ for(const a of particles){a.x+=a.vx;a.y+=a.vy;a.vy+=.15;a.l--}
+ particles=particles.filter(a=>a.l>0)
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){
+ const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#8eddf1');g.addColorStop(1,'#d8f4c7');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='#75b87d';ctx.beginPath();ctx.moveTo(0,410);ctx.quadraticCurveTo(170,270,330,395);ctx.quadraticCurveTo(520,250,710,395);ctx.quadraticCurveTo(830,300,960,390);ctx.lineTo(960,540);ctx.lineTo(0,540);ctx.fill();
+ ctx.fillStyle='rgba(255,255,255,.72)';for(const [a,b] of [[150,90],[520,110],[820,75]]){ctx.beginPath();ctx.arc(a,b,28,0,7);ctx.arc(a+28,b+4,22,0,7);ctx.arc(a-25,b+6,20,0,7);ctx.fill()}
+ for(let i=0;i<9;i++){let tx=35+i*115,ty=370-(i%3)*18;ctx.fillStyle='#6a472c';ctx.fillRect(tx,ty,15,100);ctx.fillStyle='#3f9b58';ctx.beginPath();ctx.arc(tx+8,ty,42,0,7);ctx.arc(tx-18,ty+20,30,0,7);ctx.arc(tx+32,ty+22,30,0,7);ctx.fill()}
+ for(const q of plats){ctx.fillStyle='#8b5a35';rr(q.x,q.y,q.w,q.h,8);ctx.fillStyle='#65bd59';rr(q.x,q.y-7,q.w,12,7)}
+ for(const s of stars)if(s.on){ctx.fillStyle='#ffd447';ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=i%2?7:14;ctx.lineTo(s.x+Math.cos(a)*r,s.y+Math.sin(a)*r)}ctx.closePath();ctx.fill()}
+ for(const cp of cps){ctx.fillStyle='#65442b';ctx.fillRect(cp.x,cp.y-45,5,50);ctx.fillStyle=cp.hit?'#5ed36b':'#f3b33d';ctx.beginPath();ctx.moveTo(cp.x+5,cp.y-43);ctx.lineTo(cp.x+38,cp.y-32);ctx.lineTo(cp.x+5,cp.y-21);ctx.fill()}
+ for(const e of enemies){
+  if(e.type===0){ctx.fillStyle='#e94d4d';ctx.beginPath();ctx.arc(e.x+21,e.y+22,21,0,7);ctx.fill();ctx.fillStyle='#4e9d4b';ctx.beginPath();ctx.moveTo(e.x+21,e.y+5);ctx.lineTo(e.x+11,e.y-5);ctx.lineTo(e.x+25,e.y);ctx.lineTo(e.x+34,e.y-6);ctx.lineTo(e.x+30,e.y+8);ctx.fill()}
+  else{ctx.fillStyle='#f28b28';rr(e.x+5,e.y,32,40,14);ctx.fillStyle='#55a84d';ctx.fillRect(e.x+18,e.y-9,7,12)}
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(e.x+15,e.y+20,3,0,7);ctx.arc(e.x+28,e.y+20,3,0,7);ctx.fill()
+ }
+ if(pit){ctx.fillStyle='#70452b';ctx.beginPath();ctx.ellipse(pit.x+9,pit.y+9,9,7,0,0,7);ctx.fill()}
+ if(p.inv%8<5){ctx.fillStyle='#5dbb58';ctx.beginPath();ctx.ellipse(p.x+23,p.y+29,23,29,0,0,7);ctx.fill();ctx.fillStyle='#a9df73';ctx.beginPath();ctx.ellipse(p.x+28,p.y+30,14,22,-.25,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(p.x+16,p.y+22,8,0,7);ctx.arc(p.x+31,p.y+22,8,0,7);ctx.fill();ctx.fillStyle='#222';ctx.beginPath();ctx.arc(p.x+18+(p.face>0?2:-2),p.y+23,3,0,7);ctx.arc(p.x+33+(p.face>0?2:-2),p.y+23,3,0,7);ctx.fill();ctx.strokeStyle='#222';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p.x+24,p.y+34,6,0,Math.PI);ctx.stroke();ctx.fillStyle='#6d472c';ctx.beginPath();ctx.ellipse(p.x+25,p.y+46,7,8,0,0,7);ctx.fill()}
+ for(const a of particles){ctx.fillStyle='#fff3a3';ctx.fillRect(a.x,a.y,4,4)}
+ ctx.fillStyle='rgba(24,48,35,.72)';rr(16,15,315,58,14);ctx.fillStyle='#fff';ctx.font='bold 22px system-ui';ctx.fillText('🥑 AVOCADO VALLEY',32,40);ctx.font='16px system-ui';ctx.fillText(`❤️ ${lives}   ⭐ ${score}`,32,62);
+ const bs=[['◀',55],['▶',135],['▲',W-150],['🥑',W-65]];for(const [t,bx] of bs){ctx.fillStyle='rgba(20,40,30,.58)';ctx.beginPath();ctx.arc(bx,H-65,30,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 23px system-ui';ctx.textAlign='center';ctx.fillText(t,bx,H-57);ctx.textAlign='left'}
+ if(state!=='play'){ctx.fillStyle='rgba(10,25,18,.68)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 48px system-ui';ctx.fillText(state==='win'?'LEVEL COMPLETE!':'GAME OVER',W/2,230);ctx.font='22px system-ui';ctx.fillText(`Score: ${score}  •  druk R om opnieuw te spelen`,W/2,275);ctx.textAlign='left'}
+}
+function loop(){update();draw();requestAnimationFrame(loop)}loop();
+
+c.addEventListener('pointerdown',e=>{
+ const r=c.getBoundingClientRect(),sx=W/r.width,sy=H/r.height,px=(e.clientX-r.left)*sx,py=(e.clientY-r.top)*sy;
+ if(state!=='play'){location.reload();return}
+ if(py>H-115){if(px<100)keys.ArrowLeft=true;else if(px<190)keys.ArrowRight=true;else if(px>W-200&&px<W-100)jump();else if(px>W-100)shoot()}
+});
+c.addEventListener('pointerup',()=>{keys.ArrowLeft=keys.ArrowRight=false});
+</script>
+</body></html>
